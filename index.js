@@ -14,41 +14,106 @@ const bookSeat = (userId, tripId) => {
         reject(error);
         return;
       }
-      const selectQuery =
-        "SELECT id, name, trip_id, user_id FROM Seats WHERE trip_id = ? AND user_id IS NULL LIMIT 1";
-      connection.query(selectQuery, [tripId], (error, results) => {
+      connection.beginTransaction((error) => {
         if (error) {
-          connection.release(); // Release the connection back to the pool
           reject(error);
           return;
         }
 
-        if (results.length === 0) {
-          connection.release(); // Release the connection back to the pool
-          resolve("No available seats.");
-          return;
-        }
-
-        const seatId = results[0].id;
-        const updateQuery = "UPDATE Seats SET user_id = ? WHERE id = ?";
-        connection.query(
-          updateQuery,
-          [userId, seatId],
-          (error, updateResults) => {
-            connection.release(); // Release the connection back to the pool
-            if (error) {
+        const selectQuery =
+          "SELECT id, name, trip_id, user_id FROM Seats WHERE trip_id = ? AND user_id IS NULL LIMIT 1 FOR UPDATE SKIP LOCKED";
+        connection.query(selectQuery, [tripId], (error, results) => {
+          if (error) {
+            connection.rollback(() => {
+              connection.release();
               reject(error);
-            } else {
-              resolve(
-                `User ${userId} successfully booked a seat for trip ${tripId}`
-              );
-            }
+            });
+            return;
           }
-        );
+
+          if (results.length === 0) {
+            connection.rollback(() => {
+              connection.release();
+              resolve("No available seats.");
+            });
+            return;
+          }
+
+          const updateQuery = "UPDATE Seats SET user_id = ? WHERE id = ?";
+          connection.query(
+            updateQuery,
+            [userId, results[0].id],
+            (error, updateResults) => {
+              if (error) {
+                connection.rollback(() => {
+                  connection.release();
+                  reject(error);
+                });
+              } else {
+                connection.commit((error) => {
+                  if (error) {
+                    connection.rollback(() => {
+                      connection.release();
+                      reject(error);
+                    });
+                  } else {
+                    connection.release();
+                    resolve(
+                      `User ${userId} successfully booked a seat for trip ${tripId}`
+                    );
+                  }
+                });
+              }
+            }
+          );
+        });
       });
     });
   });
 };
+
+// const bookSeat = (userId, tripId) => {
+//   return new Promise((resolve, reject) => {
+//     pool.getConnection((error, connection) => {
+//       if (error) {
+//         reject(error);
+//         return;
+//       }
+//       const selectQuery =
+//         "SELECT id, name, trip_id, user_id FROM Seats WHERE trip_id = ? AND user_id IS NULL LIMIT 1";
+//       connection.query(selectQuery, [tripId], (error, results) => {
+//         if (error) {
+//           connection.release(); // Release the connection back to the pool
+//           reject(error);
+//           return;
+//         }
+
+//         if (results.length === 0) {
+//           connection.release(); // Release the connection back to the pool
+//           resolve("No available seats.");
+//           return;
+//         }
+
+//         console.log(results, userId);
+//         const updateQuery = "UPDATE Seats SET user_id = ? WHERE id = ?";
+//         connection.query(
+//           updateQuery,
+//           [userId, results[0].id], // Use the seat ID from the query results
+//           (error, updateResults) => {
+//             connection.release(); // Release the connection back to the pool
+//             if (error) {
+//               reject(error);
+//             } else {
+//               resolve(
+//                 `User ${userId} successfully booked a seat for trip ${tripId}`
+//               );
+//             }
+//           }
+//         );
+//       });
+//     });
+//   });
+// };
 
 const numThreads = 120;
 const bookingPromises = [];
