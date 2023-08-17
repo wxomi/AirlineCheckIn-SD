@@ -5,7 +5,7 @@ const { createPool } = require("mysql");
 //and we don't have to open and close the connection every time
 //we want to execute a query
 //big tech companies use connection pools to handle multiple requests
-//it we don't do connection pooling then we will have to open the connection again and again it will be very slow due three way handshake
+//if we don't do connection pooling then we will have to open the connection again and again it will be very slow due three way handshake
 const pool = createPool({
   host: "127.0.0.1",
   user: "wxomi",
