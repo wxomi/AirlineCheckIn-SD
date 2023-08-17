@@ -1,5 +1,11 @@
 const { createPool } = require("mysql");
 
+//using conection pool to keep the connection open
+//this way we can use the same connection for multiple queries
+//and we don't have to open and close the connection every time
+//we want to execute a query
+//big tech companies use connection pools to handle multiple requests
+//it we don't do connection pooling then we will have to open the connection again and again it will be very slow due three way handshake
 const pool = createPool({
   host: "127.0.0.1",
   user: "wxomi",
@@ -21,7 +27,7 @@ const bookSeat = (userId, tripId) => {
         }
 
         const selectQuery =
-          "SELECT id, name, trip_id, user_id FROM Seats WHERE trip_id = ? AND user_id IS NULL LIMIT 1 FOR UPDATE SKIP LOCKED";
+          "SELECT id, name, trip_id, user_id FROM Seats WHERE trip_id = ? AND user_id IS NULL LIMIT 1 FOR UPDATE"; //Skip locked TO PREVENT DEADLOCK SITUATIONS
         connection.query(selectQuery, [tripId], (error, results) => {
           if (error) {
             connection.rollback(() => {
@@ -58,9 +64,8 @@ const bookSeat = (userId, tripId) => {
                     });
                   } else {
                     connection.release();
-                    resolve(
-                      `User ${userId} successfully booked a seat for trip ${tripId}`
-                    );
+                    console.log(userId, "booked a seat.", results[0].id);
+                    resolve(`${userId} - ${results[0].id}`);
                   }
                 });
               }
